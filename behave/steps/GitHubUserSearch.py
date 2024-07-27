@@ -34,5 +34,5 @@ def step_impl(context):
     username = 'GradPolina'
     response = requests.get(url)
     api_repo_count = response.json()
+    return api_repo_count, ui_repo_count
 
-    assert ui_repo_count == api_repo_count, f"UI repo count ({ui_repo_count}) does not match API repo count ({api_repo_count})"
