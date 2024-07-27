@@ -1,14 +1,17 @@
 from behave import step
 import time
+
+from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 import requests
 
-from behave.components.base import Base
+from behave_ex.components.base import Base
 
 
 @step('Navigate to {url}')
 def step_impl(context, url):
+    context.browser = webdriver.Chrome()
     context.browser.get(url)
     time.sleep(2)
 
@@ -31,8 +34,10 @@ def step_impl(context):
     repo_count = base.find_element(repo_count_xpath)
     ui_repo_count = int(repo_count.text)
     url = 'https://api.github.com/users/{username}'
-    username = 'GradPolina'
-    response = requests.get(url)
-    api_repo_count = response.json()
-    return api_repo_count, ui_repo_count
+    url_polina = url.format(username='GradPolina')
+    response = requests.get(url_polina)
+    assert response.status_code == 200
+    api_repo_count = response.json()['public_repos']
+    assert api_repo_count == ui_repo_count, (f"UI repo count ({ui_repo_count})"
+                                             f"mismatch with API repo count ({api_repo_count})")
 
