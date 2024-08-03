@@ -27,8 +27,7 @@ Feature: Search for users' data on GitHub to track changes in real time
 
 
   Scenario: Display followers components
-    Then API: send GET request to users/GradPolina/followers?per_page=100
-    And Display followers components with max 100 followers
+    Then Display followers components with max 100 followers
     And Each followers has Name and Link
 
 

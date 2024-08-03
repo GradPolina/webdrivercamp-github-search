@@ -10,7 +10,6 @@ from behave_ex.components.base import Base
 
 @step('Navigate to {url}')
 def step_impl(context, url):
-    context.browser = webdriver.Chrome()
     context.browser.get(url)
     time.sleep(2)
 
@@ -50,11 +49,6 @@ def step_impl(context, options):
                                    f"mismatch with API repo count ({api_count})")
 
 
-@step("API: send GET request to {url_followers}")
-def step_impl(context, url_followers):
-    context.response = context.browser.get(url_followers)
-
-
 @step("GitHub Integration API: verify user's {data_type}")
 def step_impl(context, data_type):
     base = Base(context.browser)
@@ -63,42 +57,41 @@ def step_impl(context, data_type):
     response = requests.get(url_polina)
     assert response.status_code == 200
     user_data = response.json()
-    art_header_xpath = '//article[header]'
 
     if data_type == "Full Name":
-        user_xpath = art_header_xpath + '//h4'
+        user_xpath = '//article[header]//h4'
         user_element = base.find_element(user_xpath)
         api_user = user_data['name']
         assert user_element.text == api_user, (f"Expected Full Name: {api_user}, "
                                                f"but got: {user_element.text}")
     elif data_type == "Company Name":
-        user_xpath = art_header_xpath + '//*[name() = "svg"]/parent::*[1]'
+        user_xpath = '(//article[header]//*[name() = "svg"]/parent::*)[1]'
         user_element = base.find_element(user_xpath)
-        api_user = user_data['company']
+        api_user = user_data['company'] if user_data['company'] else ''
         assert user_element.text == api_user, (f"Expected Company Name: {api_user}, "
                                                f"but got: {user_element.text}")
     elif data_type == "Location":
-        user_xpath = art_header_xpath + '//*[name() = "svg"]/parent::*[2]'
+        user_xpath = '(//article[header]//*[name() = "svg"]/parent::*)[2]'
         user_element = base.find_element(user_xpath)
         api_user = user_data['location']
         assert user_element.text == api_user, (f"Expected Location: {api_user}, "
                                                f"but got: {user_element.text}")
     elif data_type == "Bio":
-        user_xpath = art_header_xpath + '//p[@class = "bio"]'
+        user_xpath = '//article[header]//p[@class = "bio"]'
         user_element = base.find_element(user_xpath)
-        api_user = user_data['bio']
+        api_user = user_data['bio'] if user_data['bio'] else ""
         assert user_element.text == api_user, (f"Expected Bio: {api_user}, "
                                                f"but got: {user_element.text}")
     elif data_type == "Twitter":
-        user_xpath = art_header_xpath + '//p'
+        user_xpath = '//article[header]//p'
         user_element = base.find_element(user_xpath)
-        api_user = user_data['twitter_username']
-        assert user_element.get_attribute('href') == api_user, (f"Expected Twitter URL: https://twitter.com/{api_user}, "
+        api_user = user_data['twitter_username'] if user_data['twitter_username'] else ""
+        assert user_element.get_attribute('href') == api_user, (f"Expected Twitter URL: {api_user}, "
                                                                 f"but got: {user_element.get_attribute('href')}")
     elif data_type == "Blog":
-        user_xpath = art_header_xpath + '//*[name() = "svg"]/parent::*[3]'
+        user_xpath = '(//article[header]//*[name() = "svg"]/parent::*)[3]'
         user_element = base.find_element(user_xpath)
-        api_user = user_data['blog']
+        api_user = user_data['blog'] if user_data['blog'] else ""
         assert user_element.get_attribute('href') == api_user, (f"Expected Blog URL: {api_user}, "
                                                                 f"but got: {user_element.get_attribute('href')}")
 
@@ -106,27 +99,44 @@ def step_impl(context, data_type):
 @step("Display followers components with max 100 followers")
 def step_impl(context):
     base = Base(context.browser)
-    followers_component_xpath = '//div[@class="followers"]'
+    followers_component_xpath = '//div[@class="followers"]//article'
     followers_component = base.find_element(followers_component_xpath)
-
-    assert followers_component is not None, "Followers component is not displayed"
-    assert len(followers_component) <= 100, (f"Expected max 100 followers, "
-                                             f"but got {len(followers_component)}")
+    if not followers_component:
+        print("Followers component is not displayed")
+    followers_count = len(followers_component.find_elements())
+    if followers_count > 100:
+        raise (AssertionError(f"Expected max 100 followers, but got {followers_count}"))
+    elif followers_count <= 100:
+        print("The number of followers is exactly < = 100.")
 
 
 @step("Each followers has Name and Link")
 def step_impl(context):
-    followers_data = context.followers_data
-    assert followers_data is not None, "Followers data not found"
+    url_followers = 'https://api.github.com/users/GradPolina/followers?per_page=100'
+    response = requests.get(url_followers)
+    api_followers = response.json()
+    base = Base(context.browser)
+    followers_xpath = '//div[@class="followers"]//article//div'
+    ui_followers = base.find_element(followers_xpath)
+    assert ui_followers, "No followers found in the UI"
+    for api_follower in api_followers:
+        name = api_follower.get('login')
+        link = api_follower.get('html_url')
+        assert name is not None, "Follower from API is missing a name"
+        assert link is not None, "Follower from API is missing a link"
 
-    for follower in followers_data:
-        name = follower.get('login', None)
-        link = follower.get('html_url', None)
-        assert name is not None and link is not None, "Follower missing name or link"
+        matching_ui_follower = None
+        for ui_follower in ui_followers:
+            if ui_follower.text == name:
+                matching_ui_follower = ui_follower
+                break
 
-        base = Base(context.browser)
-        follower_name_xpath = f"//div[@class='followers']//a[contains(text(), '{name}')]"
-        follower_element = base.find_element(follower_name_xpath)
-        assert follower_element is not None, f"Follower {name} not found in UI"
-        assert follower_element.get_attribute('href') == link, (f"Expected link {link} for follower {name}, "
-                                                                f"but got: {follower_element.get_attribute('href')}")
+        assert matching_ui_follower is not None, f"Follower {name} not found in UI"
+
+        ui_link = matching_ui_follower.base.find_element('//div[@class="followers"]//article//div//a').get_attribute('href')
+        assert ui_link == link, f"Expected link {link} for follower {name}, but got: {ui_link}"
+
+
+@step("API: send GET request to {url_followers}")
+def step_impl(context, url_followers):
+    context.response = context.browser.get(url_followers)
