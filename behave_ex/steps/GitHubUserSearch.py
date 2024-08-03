@@ -26,127 +26,107 @@ def step_impl(context, username):
     time.sleep(2)
 
 
-@step("GitHub Integration API: verify total number of Repos")
-def step_impl(context):
+@step("GitHub Integration API: verify total number of {options}")
+def step_impl(context, options):
     base = Base(context.browser)
-    repo_count_xpath = '//span[@id="Repos-count")]'
-    repo_count = base.find_element(repo_count_xpath)
-    ui_repo_count = int(repo_count.text)
-    url = 'https://api.github.com/users/{username}'
-    url_polina = url.format(username='GradPolina')
-    response = requests.get(url_polina)
-    assert response.status_code == 200
-    api_repo_count = response.json()['public_repos']
-    assert api_repo_count == ui_repo_count, (f"UI repo count ({ui_repo_count})"
-                                             f"mismatch with API repo count ({api_repo_count})")
-
-
-@step("API: send GET request to {followers}")
-def step_impl(context, followers):
-    context.response = context.browser.get(followers)
-
-
-@step("GitHub Integration API: verify total number of Followers")
-def step_impl(context):
-    base = Base(context.browser)
-    followers_data_path = '//span[@id="Followers-count")]'
-    followers_count = base.find_element(followers_data_path)
-    ui_followers_count = int(followers_count.text)
-    url = 'https://api.github.com/users/{username}'
-    url_polina = url.format(username='GradPolina')
-    response = requests.get(url_polina)
-    assert response.status_code == 200
-    api_followers_count = response.json()['followers']
-    assert api_followers_count == ui_followers_count, (f"UI followers {ui_followers_count} "
-                                                       f"mismatched with API followers count {api_followers_count}")
-
-    for follower in api_followers_count:
-        assert 'login' in follower, f"Follower data missing 'login': {follower}"
-        assert 'html_url' in follower, f"Follower data missing 'html_url': {follower}"
-
-
-@step("GitHub Integration API: verify total number of Following")
-def step_impl(context):
-    base = Base(context.browser)
-    following_data_path = '//span[@id="Following-count")]'
-    following_count = base.find_element(following_data_path)
-    ui_following_count = int(following_count.text)
-    url = 'https://api.github.com/users/{username}'
-    url_polina = url.format(username='GradPolina')
-    response = requests.get(url_polina)
-    assert response.status_code == 200
-    api_followers_count = response.json()['following']
-    assert api_followers_count == ui_following_count, (f"UI following {ui_following_count} "
-                                                       f"mismatched with API following count {api_followers_count}")
-
-
-@step("GitHub Integration API: verify total number of Gists")
-def step_impl(context):
-    base = Base(context.browser)
-    gists_data_path = '//span[@id="Gists-count")]'
-    gists_count = base.find_element(gists_data_path)
-    ui_gists_count = int(gists_count.text)
-    url = 'https://api.github.com/users/{username}'
-    url_polina = url.format(username='GradPolina')
-    response = requests.get(url_polina)
-    assert response.status_code == 200
-    api_followers_count = response.json()['public_gists']
-    assert api_followers_count == ui_gists_count, (f"UI Gists {ui_gists_count} "
-                                                   f"mismatched with API Gists {api_followers_count}")
-
-
-@step("GitHub Integration API: verify user's Full Name, Twitter, Bio, Company Name, Location, and Blog")
-def step_impl(context):
-    base = context.base
-    full_name_xpath = '//span[@data-testid="full-name"]'
-    twitter_xpath = '//a[@data-testid="twitter-link"]'
-    bio_xpath = '//p[@data-testid="bio"]'
-    company_name_xpath = '//span[@data-testid="company-name"]'
-    location_xpath = '//span[@data-testid="location"]'
-    blog_xpath = '//a[@data-testid="blog-link"]'
-
-    full_name_element = base.find_element(full_name_xpath)
-    twitter_element = base.find_element(twitter_xpath)
-    bio_element = base.find_element(bio_xpath)
-    company_name_element = base.find_element(company_name_xpath)
-    location_element = base.find_element(location_xpath)
-    blog_element = base.find_element(blog_xpath)
-
+    ui_xpath = f'//section[contains(@class, "section-center")]//div[contains(., "{options}")]/h3'
+    ui_element = base.find_element(ui_xpath)
+    ui_count = int(ui_element.text)
     url = 'https://api.github.com/users/{username}'
     url_polina = url.format(username='GradPolina')
     response = requests.get(url_polina)
     assert response.status_code == 200
     user_data = response.json()
+    if options == "repos":
+        api_count = user_data['public_repos']
+    elif options == "followers":
+        api_count = user_data['followers']
+    elif options == "following":
+        api_count = user_data['following']
+    elif options == "gists":
+        api_count = user_data['public_gists']
 
-    api_full_name = response.json()['name']
-    assert full_name_element.text == api_full_name, (f"Expected full name: {api_full_name}, "
-                                                     f"but got: {full_name_element.text}")
+    assert ui_count == api_count, (f"UI repo count ({ui_count})"
+                                   f"mismatch with API repo count ({api_count})")
 
-    api_twitter = response.json()['twitter_username']
-    assert twitter_element.get_attribute('href') == api_twitter, (f"Expected Twitter URL: https://twitter.com/{api_twitter}, "
-                                                                  f"but got: {twitter_element.get_attribute('href')}")
-    api_bio = response.json()['bio']
-    assert bio_element.text == api_bio, f"Expected bio: {api_bio}, but got: {bio_element.text}"
 
-    api_company = response.json()['company']
-    assert company_name_element.text == api_company, (f"Expected company name: {api_company}, "
-                                                      f"but got: {company_name_element.text}")
+@step("API: send GET request to {url_followers}")
+def step_impl(context, url_followers):
+    context.response = context.browser.get(url_followers)
 
-    api_location = response.json()['location']
-    assert location_element.text == api_location, (f"Expected location: {api_location}, "
-                                                   f"but got: {location_element.text}")
 
-    api_blog = response.json()['blog']
-    assert blog_element.get_attribute('href') == api_blog, (f"Expected blog URL: {api_blog}, "
-                                                            f"but got: {blog_element.get_attribute('href')}")
+@step("GitHub Integration API: verify user's {data_type}")
+def step_impl(context, data_type):
+    base = Base(context.browser)
+    url = 'https://api.github.com/users/{username}'
+    url_polina = url.format(username='GradPolina')
+    response = requests.get(url_polina)
+    assert response.status_code == 200
+    user_data = response.json()
+    art_header_xpath = '//article[header]'
+
+    if data_type == "Full Name":
+        user_xpath = art_header_xpath + '//h4'
+        user_element = base.find_element(user_xpath)
+        api_user = user_data['name']
+        assert user_element.text == api_user, (f"Expected Full Name: {api_user}, "
+                                               f"but got: {user_element.text}")
+    elif data_type == "Company Name":
+        user_xpath = art_header_xpath + '//*[name() = "svg"]/parent::*[1]'
+        user_element = base.find_element(user_xpath)
+        api_user = user_data['company']
+        assert user_element.text == api_user, (f"Expected Company Name: {api_user}, "
+                                               f"but got: {user_element.text}")
+    elif data_type == "Location":
+        user_xpath = art_header_xpath + '//*[name() = "svg"]/parent::*[2]'
+        user_element = base.find_element(user_xpath)
+        api_user = user_data['location']
+        assert user_element.text == api_user, (f"Expected Location: {api_user}, "
+                                               f"but got: {user_element.text}")
+    elif data_type == "Bio":
+        user_xpath = art_header_xpath + '//p[@class = "bio"]'
+        user_element = base.find_element(user_xpath)
+        api_user = user_data['bio']
+        assert user_element.text == api_user, (f"Expected Bio: {api_user}, "
+                                               f"but got: {user_element.text}")
+    elif data_type == "Twitter":
+        user_xpath = art_header_xpath + '//p'
+        user_element = base.find_element(user_xpath)
+        api_user = user_data['twitter_username']
+        assert user_element.get_attribute('href') == api_user, (f"Expected Twitter URL: https://twitter.com/{api_user}, "
+                                                                f"but got: {user_element.get_attribute('href')}")
+    elif data_type == "Blog":
+        user_xpath = art_header_xpath + '//*[name() = "svg"]/parent::*[3]'
+        user_element = base.find_element(user_xpath)
+        api_user = user_data['blog']
+        assert user_element.get_attribute('href') == api_user, (f"Expected Blog URL: {api_user}, "
+                                                                f"but got: {user_element.get_attribute('href')}")
 
 
 @step("Display followers components with max 100 followers")
 def step_impl(context):
-    base = context.base
-    followers_component_xpath = '//div[@class="followers"]//h4'
+    base = Base(context.browser)
+    followers_component_xpath = '//div[@class="followers"]'
     followers_component = base.find_element(followers_component_xpath)
 
     assert followers_component is not None, "Followers component is not displayed"
     assert len(followers_component) <= 100, (f"Expected max 100 followers, "
                                              f"but got {len(followers_component)}")
+
+
+@step("Each followers has Name and Link")
+def step_impl(context):
+    followers_data = context.followers_data
+    assert followers_data is not None, "Followers data not found"
+
+    for follower in followers_data:
+        name = follower.get('login', None)
+        link = follower.get('html_url', None)
+        assert name is not None and link is not None, "Follower missing name or link"
+
+        base = Base(context.browser)
+        follower_name_xpath = f"//div[@class='followers']//a[contains(text(), '{name}')]"
+        follower_element = base.find_element(follower_name_xpath)
+        assert follower_element is not None, f"Follower {name} not found in UI"
+        assert follower_element.get_attribute('href') == link, (f"Expected link {link} for follower {name}, "
+                                                                f"but got: {follower_element.get_attribute('href')}")
