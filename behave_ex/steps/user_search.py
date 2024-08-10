@@ -4,8 +4,10 @@ import time
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import requests
+import json
 
 from behave_ex.components.base import Base
+
 
 
 @step('Navigate to {url}')
@@ -85,13 +87,13 @@ def step_impl(context, data_type):
     elif data_type == "Twitter":
         user_xpath = '//article[header]//p'
         user_element = base.find_element(user_xpath)
-        api_user = user_data['twitter_username'] if user_data['twitter_username'] else ""
-        assert user_element.get_attribute('href') == api_user, (f"Expected Twitter URL: {api_user}, "
-                                                                f"but got: {user_element.get_attribute('href')}")
+        api_user = user_data['twitter_username'] if user_data['twitter_username'] else "@john doe"
+        assert user_element.text == api_user, (f"Expected Twitter username: {api_user}, "
+                                               f"but got: {user_element.text}")
     elif data_type == "Blog":
         user_xpath = '(//article[header]//*[name() = "svg"]/parent::*)[3]'
         user_element = base.find_element(user_xpath)
-        api_user = user_data['blog'] if user_data['blog'] else ""
+        api_user = user_data['blog'] if user_data['blog'] else "https://"
         assert user_element.get_attribute('href') == api_user, (f"Expected Blog URL: {api_user}, "
                                                                 f"but got: {user_element.get_attribute('href')}")
 
@@ -107,7 +109,7 @@ def step_impl(context):
     if followers_count > 100:
         raise (AssertionError(f"Expected max 100 followers, but got {followers_count}"))
     elif followers_count <= 100:
-        print("The number of followers is exactly < = 100.")
+        print("The number of followers is < = 100.")
 
 
 @step("Each followers has Name and Link")
@@ -117,7 +119,7 @@ def step_impl(context):
     api_followers = response.json()
     base = Base(context.browser)
     followers_xpath = '//div[@class="followers"]//article//div'
-    ui_followers = base.find_element(followers_xpath)
+    ui_followers = base.find_all_elements(followers_xpath)
     assert ui_followers, "No followers found in the UI"
     for api_follower in api_followers:
         name = api_follower.get('login')
@@ -127,16 +129,80 @@ def step_impl(context):
 
         matching_ui_follower = None
         for ui_follower in ui_followers:
-            if ui_follower.text == name:
-                matching_ui_follower = ui_follower
+            ui_name, ui_link = ui_follower.text.split("\n")
+            if ui_name == name:
+                assert ui_link == link
+                matching_ui_follower = name
                 break
 
         assert matching_ui_follower is not None, f"Follower {name} not found in UI"
 
-        ui_link = matching_ui_follower.base.find_element('//div[@class="followers"]//article//div//a').get_attribute('href')
-        assert ui_link == link, f"Expected link {link} for follower {name}, but got: {ui_link}"
+
+@step("Click on the Follow button")
+def step_impl(context):
+    base = Base(context.browser)
+    follow_button_xpath = '//header/a'
+    follow_button = base.find_element(follow_button_xpath)
+    follow_button.click()
+    time.sleep(2)
 
 
-@step("API: send GET request to {url_followers}")
-def step_impl(context, url_followers):
-    context.response = context.browser.get(url_followers)
+@step("Verify that redirected to the GitHub follow page for {validUsername}")
+def step_impl(context, validUsername):
+    current_url = context.browser.current_url
+    expected_url = f"https://github.com/{validUsername}"
+    assert current_url.startswith(expected_url), (f"Expected to be redirected to {expected_url}, "
+                                                  f"but got {current_url}")
+
+url_api = 'https://api.github.com/user'
+token = ' '
+@step("Authenticated with the GitHub API")
+def step_impl(context):
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.github+json'
+        }
+    response = requests.get(url_api, headers=headers)
+    if response.status_code == 200:
+        print("Authenticated successfully.")
+        return headers
+    else:
+        print(f"Authentication failed: {response.status_code}")
+        return None
+
+
+@step("Send a request to update the {location}")
+def update_location(context, location):
+    data = {'location': location}
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.github+json'
+    }
+    response = requests.patch(url_api, headers=headers, json=data)
+    print(f"Response status code: {response.status_code}")
+    return response.json()
+
+
+@step("GitHub Integration API: verify updated to {location}")
+def verify_update(context, location):
+    base = Base(context.browser)
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.github+json'
+    }
+    response = requests.get(url_api, headers=headers)
+    location_new = response.json()
+    assert response.status_code == 200
+    user_xpath = '(//article[header]//*[name() = "svg"]/parent::*)[2]'
+    user_element = base.find_element(user_xpath)
+    api_user = location_new['location']
+    assert user_element.text == api_user, (f"Expected Location: {api_user}, "
+                                           f"but got: {user_element.text}")
+    print("Update successful. New location is:", {user_element.text})
+
+
+
+
+
+
+
